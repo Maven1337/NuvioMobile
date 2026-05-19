@@ -39,6 +39,10 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
+      - name: Create stub local.properties
+        run: |
+          touch local.properties
+
       - name: Build unsigned iPhoneOS app
         run: |
           xcodebuild \
