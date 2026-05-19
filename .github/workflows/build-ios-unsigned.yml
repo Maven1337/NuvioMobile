@@ -1,0 +1,67 @@
+name: Build Unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      distribution:
+        description: iOS distribution source set
+        required: true
+        default: appstore
+        type: choice
+        options:
+          - appstore
+          - full
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-ios:
+    runs-on: macos-latest
+    env:
+      NUVIO_IOS_DISTRIBUTION: ${{ inputs.distribution }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Build unsigned iPhoneOS app
+        run: |
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination generic/platform=iOS \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos" -maxdepth 1 -name "*.app" | head -n 1)
+          test -d "$APP_PATH"
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qry unsigned-ios-app.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ios-ipa-${{ inputs.distribution }}
+          path: ${{ runner.temp }}/unsigned-ios-app.ipa
